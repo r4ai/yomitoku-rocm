@@ -1,0 +1,32 @@
+[project]
+name = "yomitoku-pdf"
+version = "0.1.0"
+description = "ROCm-ready YomiToku PDF OCR helper for WSL2 with mise and uv"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "torch==2.11.0",
+    "torchvision==0.26.0",
+    "torchaudio==2.11.0",
+    "triton-rocm==3.6.0",
+    "yomitoku==0.13.0",
+]
+
+[project.scripts]
+yomitoku-pdf = "yomitoku_pdf.cli:main"
+yomitoku-pdf-doctor = "yomitoku_pdf.doctor:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+torch = { index = "pytorch-rocm" }
+torchvision = { index = "pytorch-rocm" }
+torchaudio = { index = "pytorch-rocm" }
+triton-rocm = { index = "pytorch-rocm" }
+
+[[tool.uv.index]]
+name = "pytorch-rocm"
+url = "https://download.pytorch.org/whl/rocm7.2"
+explicit = true
