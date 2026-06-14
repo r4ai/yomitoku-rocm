@@ -88,5 +88,5 @@ rocminfo | sed -n '1,160p'
 
 echo
 echo "ROCm/ROCDXG setup finished. Run 'wsl --shutdown' from PowerShell, reopen WSL, then run:"
-echo "  cd /home/r4ai/src/repos/github.com/r4ai/yomitoku-pdf"
+echo "  cd path/to/yomitoku-rocm"
 echo "  mise run doctor"
