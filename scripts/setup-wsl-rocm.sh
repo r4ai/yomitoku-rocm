@@ -22,6 +22,14 @@ if [[ "${ID:-}" != "ubuntu" || "${VERSION_ID:-}" != "24.04" ]]; then
   exit 1
 fi
 
+echo "==> Checking apt/dpkg state"
+if ! sudo dpkg --audit >/dev/null; then
+  echo "ERROR: dpkg is not in a clean state." >&2
+  echo "Run this first, then retry this task:" >&2
+  echo "  sudo dpkg --configure -a" >&2
+  exit 1
+fi
+
 echo "==> Installing ROCm ${ROCM_VERSION} package repository"
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT

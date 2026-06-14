@@ -2,6 +2,12 @@
 python = "3.12"
 uv = "latest"
 
+# ROCm on WSL detects the GPU through /dev/dxg only when this flag is set.
+# Defined here so every `mise run` task gets it regardless of the login shell
+# (fish does not source /etc/profile.d/*.sh).
+[env]
+HSA_ENABLE_DXG_DETECTION = "1"
+
 [tasks.sync]
 description = "Install locked Python dependencies with uv"
 run = "uv sync"
