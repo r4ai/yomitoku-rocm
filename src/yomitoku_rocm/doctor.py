@@ -87,8 +87,8 @@ def check_python_packages() -> bool:
 
 
 def main() -> int:
-    print("YomiToku PDF ROCm doctor")
-    print("========================")
+    print("yomitoku-rocm doctor")
+    print("====================")
     rocm_ok = check_rocm_devices()
     packages_ok = check_python_packages()
 

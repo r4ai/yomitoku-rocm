@@ -1,7 +1,7 @@
 [project]
-name = "yomitoku-pdf"
+name = "yomitoku-rocm"
 version = "0.1.0"
-description = "ROCm-ready YomiToku PDF OCR helper for WSL2 with mise and uv"
+description = "ROCm-ready YomiToku OCR environment for WSL2 with mise and uv"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
 dependencies = [
@@ -13,8 +13,8 @@ dependencies = [
 ]
 
 [project.scripts]
-yomitoku-pdf = "yomitoku_pdf.cli:main"
-yomitoku-pdf-doctor = "yomitoku_pdf.doctor:main"
+yomitoku-rocm = "yomitoku_rocm.cli:main"
+yomitoku-rocm-doctor = "yomitoku_rocm.doctor:main"
 
 [build-system]
 requires = ["hatchling"]

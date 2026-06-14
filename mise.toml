@@ -18,7 +18,7 @@ run = "uv lock"
 
 [tasks.doctor]
 description = "Check WSL ROCm, PyTorch, and YomiToku availability"
-run = "uv run yomitoku-pdf-doctor"
+run = "uv run yomitoku-rocm-doctor"
 
 [tasks.setup-wsl-rocm]
 description = "Install ROCm and ROCDXG for WSL. Requires sudo."
@@ -26,4 +26,4 @@ run = "bash scripts/setup-wsl-rocm.sh"
 
 [tasks.ocr]
 description = "Run YomiToku OCR on a PDF or image. Usage: mise run ocr -- input.pdf [args...]"
-run = "uv run yomitoku-pdf"
+run = "uv run yomitoku"

@@ -1,6 +1,6 @@
-# yomitoku-pdf
+# yomitoku-rocm
 
-ROCm on WSL2 で [YomiToku](https://github.com/kotaro-kinoshita/yomitoku) を動かし、PDF を searchable PDF・Markdown・JSON・CSV・HTML に変換するヘルパーツールです。
+ROCm on WSL2 で [YomiToku](https://github.com/kotaro-kinoshita/yomitoku) を動かすための環境セットアップ集です。AMD GPU 向けの PyTorch ROCm 依存関係、mise タスク、環境確認ツール（doctor）をまとめています。
 
 ## 前提条件
 
@@ -39,18 +39,18 @@ mise run setup-wsl-rocm
 
 #### グローバルインストール（推奨）
 
-どのディレクトリからでも `yomitoku-pdf` コマンドを使いたい場合は、`uv tool install` でグローバルにインストールします。
+`uv tool install` でグローバルにインストールすると、どのディレクトリからでも `yomitoku-rocm` と `yomitoku-rocm-doctor` を呼べます。
 
 ```bash
-git clone https://github.com/r4ai/yomitoku-pdf
-cd yomitoku-pdf
+git clone https://github.com/r4ai/yomitoku-rocm
+cd yomitoku-rocm
 uv tool install .
 ```
 
-インストール後、`~/.local/bin` に `yomitoku-pdf` と `yomitoku-pdf-doctor` が追加されます。PATH が通っているか確認してください:
+インストール後、`~/.local/bin` にコマンドが追加されます。PATH が通っているか確認してください:
 
 ```bash
-which yomitoku-pdf
+which yomitoku-rocm
 ```
 
 通っていない場合は `~/.local/bin` を PATH に追加します:
@@ -83,7 +83,7 @@ mise run sync
 ### 3. 動作確認
 
 ```bash
-yomitoku-pdf-doctor
+yomitoku-rocm-doctor
 # または開発環境では:
 mise run doctor
 ```
@@ -98,17 +98,23 @@ mise run doctor
 
 ## 使い方
 
+`yomitoku-rocm` は `yomitoku` CLI への透過的なラッパーです。引数はそのまま yomitoku に転送されます。
+
+```bash
+yomitoku-rocm --help
+```
+
 ### グローバルインストール後
 
 ```bash
 # searchable PDF を作成
-yomitoku-pdf sample.pdf -o results -f pdf -d cuda --combine
+yomitoku-rocm sample.pdf -o results -f pdf -d cuda --combine
 
 # Markdown を作成（図も抽出）
-yomitoku-pdf sample.pdf -o results -f md -d cuda --combine --figure
+yomitoku-rocm sample.pdf -o results -f md -d cuda --combine --figure
 
 # CPU で動作確認（GPU なし環境）
-yomitoku-pdf sample.pdf -o results -f md --lite -d cpu
+yomitoku-rocm sample.pdf -o results -f md --lite -d cpu
 ```
 
 ### mise 経由（開発環境）
@@ -117,15 +123,7 @@ yomitoku-pdf sample.pdf -o results -f md --lite -d cpu
 mise run ocr -- sample.pdf -o results -f pdf -d cuda --combine
 ```
 
-`mise run ocr` は `uv run yomitoku-pdf` のショートカットです。`HSA_ENABLE_DXG_DETECTION=1` も自動的に設定されます。
-
-### オプション一覧
-
-```bash
-yomitoku-pdf --help
-```
-
-`yomitoku-pdf` は YomiToku CLI の薄いラッパーです。YomiToku のオプションをそのまま渡せます。
+`mise run ocr` は `uv run yomitoku` を直接呼びます。`HSA_ENABLE_DXG_DETECTION=1` も自動的に設定されます。
 
 ## 依存関係について
 
@@ -148,4 +146,4 @@ WSL 側の ROCm パッケージ導入が未完了です。Ubuntu 標準リポジ
 
 **グローバルインストール後に GPU が検出されない**
 
-`HSA_ENABLE_DXG_DETECTION=1` がシェル環境に設定されているか確認してください。`mise run` 経由の場合は `mise.toml` で自動設定されますが、直接 `yomitoku-pdf` を呼ぶ場合はシェルの設定ファイルへの追加が必要です（[セットアップ手順を参照](#2-インストール)）。
+`HSA_ENABLE_DXG_DETECTION=1` がシェル環境に設定されているか確認してください。`mise run` 経由の場合は `mise.toml` で自動設定されますが、直接 `yomitoku-rocm` を呼ぶ場合はシェルの設定ファイルへの追加が必要です（[セットアップ手順を参照](#2-インストール)）。
