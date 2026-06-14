@@ -1,78 +1,151 @@
 # yomitoku-pdf
 
-ROCm on WSL2 で YomiToku を使い、PDF を OCR して searchable PDF、Markdown、JSON、CSV、HTML に変換するための `mise` + `uv` プロジェクトです。
+ROCm on WSL2 で [YomiToku](https://github.com/kotaro-kinoshita/yomitoku) を動かし、PDF を searchable PDF・Markdown・JSON・CSV・HTML に変換するヘルパーツールです。
 
-## 前提
+## 前提条件
 
-- Windows 側に AMD Software: Adrenalin Edition for WSL2 を入れます。
-- WSL 側は Ubuntu 24.04 または 22.04 を使います。このリポジトリは Ubuntu 24.04 で作っています。
-- AMD の WSL ROCm 最新系は ROCDXG + ROCm 7.2.1 前提です。ROCDXG の Quickstart 後、WSL 内で `rocminfo` が GPU agent を表示する状態にしてください。
-- RX 7000/9000 系 GPU を想定しています。
-- ROCm PyTorch では AMD GPU も PyTorch 上は `cuda` device として扱われます。YomiToku 実行時も `-d cuda` を使います。
+- **GPU**: AMD RX 7000/9000 系（ROCm 対応）
+- **OS**: Windows + WSL2（Ubuntu 24.04 推奨）
+- **Windows 側**: AMD Software: Adrenalin Edition for WSL2 をインストール済み
+- **WSL 側**: ROCm 7.2.1 + ROCDXG 導入済み、`rocminfo` で GPU agent が表示される状態
 
-参考:
+> ROCm PyTorch では AMD GPU も `cuda` デバイスとして扱われます。YomiToku 実行時は `-d cuda` を使います。
 
-- AMD ROCm WSL guide: <https://rocm.docs.amd.com/projects/radeon-ryzen/en/latest/docs/install/installrad/wsl/howto_wsl.html>
-- AMD PyTorch on ROCm: <https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/3rd-party/pytorch-install.html>
-- uv PyTorch integration: <https://docs.astral.sh/uv/guides/integration/pytorch/>
-- YomiToku: <https://github.com/kotaro-kinoshita/yomitoku>
+参考ドキュメント:
+
+- [AMD ROCm WSL インストールガイド](https://rocm.docs.amd.com/projects/radeon-ryzen/en/latest/docs/install/installrad/wsl/howto_wsl.html)
+- [AMD PyTorch on ROCm](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/3rd-party/pytorch-install.html)
+- [uv PyTorch インテグレーション](https://docs.astral.sh/uv/guides/integration/pytorch/)
 
 ## セットアップ
 
-WSL 側の ROCm / ROCDXG をまだ入れていない場合:
+### 1. ROCm / ROCDXG の導入（WSL）
+
+WSL 側の ROCm をまだ入れていない場合は、このリポジトリのセットアップスクリプトで一括導入できます:
 
 ```bash
 mise run setup-wsl-rocm
 ```
 
-この task は `sudo` を使い、AMD ROCm 7.2.4 の apt repository 登録、`rocm` userspace package の導入、ROCDXG のビルド/インストール、`HSA_ENABLE_DXG_DETECTION=1` の設定を行います。完了後に PowerShell で `wsl --shutdown` してから WSL を開き直してください。
+このスクリプトは `sudo` を使い、以下を行います:
 
-YomiToku 用 Python 環境:
+- AMD ROCm 7.2.4 の apt リポジトリ登録と `rocm` パッケージの導入
+- ROCDXG のビルドとインストール
+- `/etc/environment` への `HSA_ENABLE_DXG_DETECTION=1` の追加
+
+完了後は PowerShell で `wsl --shutdown` してから WSL を起動し直してください。
+
+### 2. インストール
+
+#### グローバルインストール（推奨）
+
+どのディレクトリからでも `yomitoku-pdf` コマンドを使いたい場合は、`uv tool install` でグローバルにインストールします。
+
+```bash
+git clone https://github.com/r4ai/yomitoku-pdf
+cd yomitoku-pdf
+uv tool install .
+```
+
+インストール後、`~/.local/bin` に `yomitoku-pdf` と `yomitoku-pdf-doctor` が追加されます。PATH が通っているか確認してください:
+
+```bash
+which yomitoku-pdf
+```
+
+通っていない場合は `~/.local/bin` を PATH に追加します:
+
+```bash
+# bash / zsh
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+
+# fish
+fish_add_path ~/.local/bin
+```
+
+GPU 検出に必要な環境変数をシェルの設定に追加します（`mise run` を経由しない場合に必要）:
+
+```bash
+# bash / zsh
+echo 'export HSA_ENABLE_DXG_DETECTION=1' >> ~/.bashrc
+
+# fish
+set -Ux HSA_ENABLE_DXG_DETECTION 1
+```
+
+#### 開発者向けセットアップ（mise + uv）
 
 ```bash
 mise install
 mise run sync
+```
+
+### 3. 動作確認
+
+```bash
+yomitoku-pdf-doctor
+# または開発環境では:
 mise run doctor
 ```
 
-`mise run doctor` は次を確認します。
+以下を確認します:
 
 - `/dev/dxg` が存在する
 - `rocminfo` が使える
-- `torch.version.hip` が ROCm build を示す
+- `torch.version.hip` が ROCm ビルドを示す
 - `torch.cuda.is_available()` が `True`
 - `yomitoku` の import と CLI 起動ができる
 
-この環境では PyTorch 関連パッケージだけを `https://download.pytorch.org/whl/rocm7.2` から取得するよう `pyproject.toml` で明示しています。他の依存関係は通常の PyPI から解決します。2026-06-14 時点でこの index に公開されている Python 3.12 向けの整合セットとして、`torch==2.11.0`、`torchvision==0.26.0`、`torchaudio==2.11.0` を固定しています。
+## 使い方
 
-## PDF OCR
+### グローバルインストール後
 
-searchable PDF を作る例:
+```bash
+# searchable PDF を作成
+yomitoku-pdf sample.pdf -o results -f pdf -d cuda --combine
+
+# Markdown を作成（図も抽出）
+yomitoku-pdf sample.pdf -o results -f md -d cuda --combine --figure
+
+# CPU で動作確認（GPU なし環境）
+yomitoku-pdf sample.pdf -o results -f md --lite -d cpu
+```
+
+### mise 経由（開発環境）
 
 ```bash
 mise run ocr -- sample.pdf -o results -f pdf -d cuda --combine
 ```
 
-Markdown を作る例:
+`mise run ocr` は `uv run yomitoku-pdf` のショートカットです。`HSA_ENABLE_DXG_DETECTION=1` も自動的に設定されます。
+
+### オプション一覧
 
 ```bash
-uv run yomitoku-pdf sample.pdf -o results -f md -d cuda --combine --figure
+yomitoku-pdf --help
 ```
 
-GPU が使えない環境で最低限確認する例:
+`yomitoku-pdf` は YomiToku CLI の薄いラッパーです。YomiToku のオプションをそのまま渡せます。
 
-```bash
-uv run yomitoku-pdf sample.pdf -o results -f md --lite -d cpu
-```
+## 依存関係について
 
-`yomitoku-pdf` は YomiToku CLI を薄く包んだラッパーです。主なオプションはそのまま渡せます。
-
-```bash
-uv run yomitoku-pdf --help
-```
+PyTorch 関連パッケージは `https://download.pytorch.org/whl/rocm7.2` から取得するよう `pyproject.toml` で明示しています。2026-06-14 時点でこの index の Python 3.12 向け整合セットとして `torch==2.11.0`、`torchvision==0.26.0`、`torchaudio==2.11.0` を固定しています。
 
 ## トラブルシュート
 
-`rocminfo` が見つからない場合は、WSL 側の ROCm パッケージ導入が未完了です。Ubuntu 標準リポジトリの古い `rocminfo` ではなく、AMD の ROCm 7.2.1 / ROCDXG 手順に沿って導入してください。
+**`rocminfo` が見つからない**
 
-`torch.cuda.is_available()` が `False` の場合は、Windows 側ドライバ、ROCDXG、WSL の GPU device 公開、GPU の対応状況を順に確認してください。まず `/dev/dxg` と `rocminfo` の GPU agent 表示が必要です。
+WSL 側の ROCm パッケージ導入が未完了です。Ubuntu 標準リポジトリの古い `rocminfo` ではなく、AMD の ROCm 7.2.1 / ROCDXG 手順に沿って導入してください。
+
+**`torch.cuda.is_available()` が `False`**
+
+以下を順に確認してください:
+
+1. `/dev/dxg` が存在するか
+2. `rocminfo` で GPU agent が表示されるか
+3. Windows 側の Adrenalin Edition ドライバが正しくインストールされているか
+4. `wsl --shutdown` 後に WSL を起動し直したか
+
+**グローバルインストール後に GPU が検出されない**
+
+`HSA_ENABLE_DXG_DETECTION=1` がシェル環境に設定されているか確認してください。`mise run` 経由の場合は `mise.toml` で自動設定されますが、直接 `yomitoku-pdf` を呼ぶ場合はシェルの設定ファイルへの追加が必要です（[セットアップ手順を参照](#2-インストール)）。
