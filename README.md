@@ -110,11 +110,16 @@ yomitoku-rocm --help
 yomitoku-pdf large.pdf -o results -f pdf -d cuda
 ```
 
-実行中は完了ページ数、進捗率、残り時間、予想終了時刻をチャンクごとに表示します。途中で停止した場合は、同じ PDF・チャンクサイズ・出力形式で再実行すると `results/.yomitoku-pdf/<fingerprint>/manifest.json` をもとに完了済みチャンクをスキップして再開します。正常完了後はこの作業ディレクトリを自動削除します。
+実行中は進捗バー・完了ページ数・進捗率・経過時間・1 ページあたりの処理速度・残り時間・予想終了時刻と、直近のチャンク結果をライブ表示します。yomitoku 本体のログは画面を汚さないよう抑制し、チャンクが失敗したときだけ末尾のログを表示します。途中で停止した場合は、同じ PDF・チャンクサイズ・出力形式で再実行すると `results/.yomitoku-pdf/<fingerprint>/manifest.json` をもとに完了済みチャンクをスキップして再開します。正常完了後はこの作業ディレクトリを自動削除します。
+
+パイプやファイルへリダイレクトした場合（非対話端末）は、1 イベント 1 行のプレーンな進捗ログへ自動で切り替わります。
 
 ```bash
 # 20 ページ単位に変更
 yomitoku-pdf large.pdf --chunk-size 20 -o results -f pdf -d cuda
+
+# yomitoku の生ログをそのまま流す（進捗ダッシュボードは無効）
+yomitoku-pdf large.pdf --verbose -o results -f pdf -d cuda
 
 # デバッグ用に途中成果物を残す
 yomitoku-pdf large.pdf --keep-workdir -o results -f pdf -d cuda

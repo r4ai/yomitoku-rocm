@@ -10,17 +10,20 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from pypdf import PdfReader, PdfWriter
 
 from yomitoku_rocm.executable import find_yomitoku_executable
+from yomitoku_rocm.progress import make_reporter
 
 MANIFEST_VERSION = 1
 DEFAULT_CHUNK_SIZE = 10
 SUPPORTED_FORMATS = {"json", "csv", "html", "md", "pdf"}
+CAPTURED_TAIL_LINES = 20
+RESUME_HINT = "Re-run the same command to resume after fixing the error."
 
 
 @dataclass(frozen=True)
@@ -99,77 +102,133 @@ def main() -> int:
     write_chunks(reader, chunks, manifest)
     started_at = time.monotonic()
     done_pages_at_start = count_done_pages(chunks, manifest)
+    final_path = final_output_path(input_pdf, outdir, fmt)
 
-    for chunk in chunks:
-        chunk_key = str(chunk.index)
-        chunk_state = manifest["chunks"].setdefault(chunk_key, {})
-        output_path = chunk_state.get("output_path")
-        if (
-            chunk_state.get("status") == "done"
-            and output_path
-            and Path(output_path).exists()
-        ):
-            print_progress(
-                chunks, manifest, started_at, done_pages_at_start, skipped=True
-            )
-            continue
-
-        print(
-            f"[chunk {chunk.index + 1}/{len(chunks)}] "
-            f"pages {chunk.start_page}-{chunk.end_page} ({chunk.page_count} pages)",
-            flush=True,
+    with make_reporter(verbose=args.verbose) as reporter:
+        reporter.start(
+            input_label=str(input_pdf),
+            output_label=str(final_path),
+            fmt=fmt,
+            total_pages=total_pages,
+            total_chunks=len(chunks),
+            done_pages=done_pages_at_start,
         )
-        chunk.outdir.mkdir(parents=True, exist_ok=True)
-        command = build_yomitoku_command(exe, yomitoku_args, chunk, fmt)
-        result = subprocess.run(command, check=False, env=child_env())
-        if result.returncode != 0:
+
+        for chunk in chunks:
+            chunk_key = str(chunk.index)
+            chunk_state = manifest["chunks"].setdefault(chunk_key, {})
+            output_path = chunk_state.get("output_path")
+            if (
+                chunk_state.get("status") == "done"
+                and output_path
+                and Path(output_path).exists()
+            ):
+                reporter.chunk_skip(
+                    index=chunk.index,
+                    start_page=chunk.start_page,
+                    end_page=chunk.end_page,
+                    done_pages=count_done_pages(chunks, manifest),
+                )
+                continue
+
+            reporter.chunk_start(
+                index=chunk.index,
+                total_chunks=len(chunks),
+                start_page=chunk.start_page,
+                end_page=chunk.end_page,
+                page_count=chunk.page_count,
+            )
+            chunk.outdir.mkdir(parents=True, exist_ok=True)
+            command = build_yomitoku_command(exe, yomitoku_args, chunk, fmt)
+            result = run_chunk(command, capture=not args.verbose)
+            if result.returncode != 0:
+                chunk_state.update(
+                    {
+                        "status": "failed",
+                        "returncode": result.returncode,
+                        "updated_at": now_iso(),
+                    }
+                )
+                save_manifest(manifest_path, manifest)
+                reporter.chunk_fail(
+                    index=chunk.index,
+                    total_chunks=len(chunks),
+                    message=(
+                        f"yomitoku exited with code {result.returncode} "
+                        f"on chunk {chunk.index + 1} "
+                        f"(pages {chunk.start_page}-{chunk.end_page})."
+                    ),
+                    captured=tail_output(result),
+                    hint=RESUME_HINT,
+                )
+                return result.returncode
+
+            produced = find_chunk_output(chunk.outdir, fmt)
+            if produced is None:
+                chunk_state.update({"status": "failed", "updated_at": now_iso()})
+                save_manifest(manifest_path, manifest)
+                reporter.chunk_fail(
+                    index=chunk.index,
+                    total_chunks=len(chunks),
+                    message=(
+                        f"yomitoku finished but produced no .{fmt} file "
+                        f"in {chunk.outdir}."
+                    ),
+                    captured=tail_output(result),
+                    hint=RESUME_HINT,
+                )
+                return 1
+
             chunk_state.update(
                 {
-                    "status": "failed",
-                    "returncode": result.returncode,
+                    "status": "done",
+                    "output_path": str(produced),
+                    "page_count": chunk.page_count,
                     "updated_at": now_iso(),
                 }
             )
             save_manifest(manifest_path, manifest)
-            print(
-                f"Stopped at chunk {chunk.index + 1}. "
-                f"Re-run the same command to resume after fixing the error.",
-                file=sys.stderr,
-                flush=True,
+            reporter.chunk_done(
+                index=chunk.index,
+                start_page=chunk.start_page,
+                end_page=chunk.end_page,
+                done_pages=count_done_pages(chunks, manifest),
             )
-            return result.returncode
 
-        produced = find_chunk_output(chunk.outdir, fmt)
-        if produced is None:
-            chunk_state.update({"status": "failed", "updated_at": now_iso()})
-            save_manifest(manifest_path, manifest)
-            print(
-                f"YomiToku completed but no .{fmt} output was found in {chunk.outdir}",
-                file=sys.stderr,
-            )
-            return 1
-
-        chunk_state.update(
-            {
-                "status": "done",
-                "output_path": str(produced),
-                "page_count": chunk.page_count,
-                "updated_at": now_iso(),
-            }
+        merge_outputs(
+            chunks, manifest, final_path, fmt, resolve_encoding(yomitoku_args)
         )
-        save_manifest(manifest_path, manifest)
-        print_progress(chunks, manifest, started_at, done_pages_at_start)
 
-    final_path = final_output_path(input_pdf, outdir, fmt)
-    merge_outputs(chunks, manifest, final_path, fmt, resolve_encoding(yomitoku_args))
-    print(f"Output file: {final_path}")
+        if args.keep_workdir:
+            reporter.info(f"Work directory kept: {workdir}")
+        else:
+            shutil.rmtree(workdir)
 
-    if args.keep_workdir:
-        print(f"Work directory kept: {workdir}")
-    else:
-        shutil.rmtree(workdir)
+        reporter.finish(
+            output_label=str(final_path),
+            total_pages=total_pages,
+            elapsed=time.monotonic() - started_at,
+        )
 
     return 0
+
+
+def run_chunk(command: list[str], capture: bool) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        command,
+        check=False,
+        env=child_env(),
+        capture_output=capture,
+        text=capture,
+    )
+
+
+def tail_output(result: subprocess.CompletedProcess[str]) -> list[str] | None:
+    chunks = [result.stdout or "", result.stderr or ""]
+    combined = "\n".join(part.strip() for part in chunks if part and part.strip())
+    if not combined:
+        return None
+    return combined.splitlines()[-CAPTURED_TAIL_LINES:]
 
 
 def parse_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
@@ -184,6 +243,11 @@ def parse_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
     parser.add_argument("--keep-workdir", action="store_true")
     parser.add_argument(
         "--force", action="store_true", help="discard incompatible saved progress"
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="stream raw yomitoku output instead of the live progress dashboard",
     )
     args, yomitoku_args = parser.parse_known_args(argv)
     if args.chunk_size < 1:
@@ -382,36 +446,6 @@ def count_done_pages(chunks: list[Chunk], manifest: dict[str, Any]) -> int:
         if state.get("status") == "done":
             total += chunk.page_count
     return total
-
-
-def print_progress(
-    chunks: list[Chunk],
-    manifest: dict[str, Any],
-    started_at: float,
-    done_pages_at_start: int,
-    skipped: bool = False,
-) -> None:
-    total_pages = sum(chunk.page_count for chunk in chunks)
-    done_pages = count_done_pages(chunks, manifest)
-    elapsed = max(time.monotonic() - started_at, 0.001)
-    processed_this_run = max(done_pages - done_pages_at_start, 0)
-    prefix = "resume" if skipped else "progress"
-    if processed_this_run == 0:
-        print(
-            f"[{prefix}] {done_pages}/{total_pages} pages done; ETA calculating",
-            flush=True,
-        )
-        return
-    seconds_per_page = elapsed / processed_this_run
-    remaining_pages = total_pages - done_pages
-    remaining = timedelta(seconds=int(seconds_per_page * remaining_pages))
-    eta = datetime.now().astimezone() + remaining
-    print(
-        f"[{prefix}] {done_pages}/{total_pages} pages done "
-        f"({done_pages / total_pages:.1%}); remaining {remaining}; "
-        f"ETA {eta.strftime('%Y-%m-%d %H:%M:%S %Z')}",
-        flush=True,
-    )
 
 
 def final_output_path(input_pdf: Path, outdir: Path, fmt: str) -> Path:
