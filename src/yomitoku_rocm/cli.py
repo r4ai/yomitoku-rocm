@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 import sys
 
+from yomitoku_rocm.executable import find_yomitoku_executable
+
 
 def main() -> int:
-    exe = shutil.which("yomitoku")
+    exe = find_yomitoku_executable()
     if exe is None:
         print("yomitoku not found. Run: uv sync", file=sys.stderr)
         return 1

@@ -16,6 +16,8 @@ from typing import Any
 
 from pypdf import PdfReader, PdfWriter
 
+from yomitoku_rocm.executable import find_yomitoku_executable
+
 
 MANIFEST_VERSION = 1
 DEFAULT_CHUNK_SIZE = 10
@@ -67,7 +69,7 @@ def main() -> int:
         print(f"yomitoku-pdf supports PDF input only: {input_pdf}", file=sys.stderr)
         return 2
 
-    exe = shutil.which("yomitoku")
+    exe = find_yomitoku_executable()
     if exe is None:
         print("yomitoku not found. Run: uv sync", file=sys.stderr)
         return 1

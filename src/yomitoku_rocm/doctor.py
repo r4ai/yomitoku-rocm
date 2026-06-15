@@ -5,6 +5,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from yomitoku_rocm.executable import find_yomitoku_executable
+
 
 def print_check(name: str, ok: bool, detail: str = "") -> bool:
     status = "OK" if ok else "FAIL"
@@ -76,7 +78,7 @@ def check_python_packages() -> bool:
         version = importlib.metadata.version("yomitoku")
         ok &= print_check("yomitoku import", True, f"version={version}")
 
-    yomitoku_cli = shutil.which("yomitoku")
+    yomitoku_cli = find_yomitoku_executable()
     ok &= print_check("yomitoku CLI", yomitoku_cli is not None, yomitoku_cli or "not found")
     if yomitoku_cli is not None:
         code, output = command_output([yomitoku_cli, "--help"])
@@ -102,4 +104,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
