@@ -17,7 +17,15 @@ from rich.table import Table
 from rich.text import Text
 
 BAR_WIDTH = 32
-RECENT_LIMIT = 4
+SUB_BAR_WIDTH = 14
+RECENT_LIMIT = 3
+LOG_LIMIT = 3
+
+
+def clean_log_line(line: str) -> str:
+    """Strip the ``time - name - LEVEL -`` prefix yomitoku's logger prepends."""
+    parts = line.rstrip().split(" - ", 3)
+    return parts[-1] if len(parts) == 4 else line.rstrip()
 
 
 def format_duration(seconds: float) -> str:
@@ -92,6 +100,10 @@ class ProgressReporter:
         end_page: int,
         page_count: int,
     ) -> None: ...
+
+    def page_tick(self) -> None: ...
+
+    def log_line(self, line: str) -> None: ...
 
     def chunk_done(
         self, *, index: int, start_page: int, end_page: int, done_pages: int
@@ -220,9 +232,8 @@ class _Dashboard:
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
         r = self.reporter
-        m = compute_metrics(
-            r.done_pages, r.total_pages, r.started_at, r.done_pages_at_start
-        )
+        done = r.displayed_done
+        m = compute_metrics(done, r.total_pages, r.started_at, r.done_pages_at_start)
 
         yield Text("")
         yield Padding(
@@ -242,7 +253,7 @@ class _Dashboard:
             chunk_label = f"{r.total_chunks}/{r.total_chunks} chunks"
         bar = ProgressBar(
             total=r.total_pages or 1,
-            completed=r.done_pages,
+            completed=done,
             width=BAR_WIDTH,
             complete_style="cyan",
             finished_style="green",
@@ -253,7 +264,7 @@ class _Dashboard:
             Text.assemble(
                 (f"{m.fraction:>4.0%}", "bold"),
                 ("   ", ""),
-                (f"{r.done_pages}/{r.total_pages} pages", "white"),
+                (f"{done}/{r.total_pages} pages", "white"),
                 ("   ", ""),
                 (chunk_label, "cyan"),
             ),
@@ -281,16 +292,37 @@ class _Dashboard:
                 )
             if r.current is not None:
                 index, start_page, end_page = r.current
+                sub = ProgressBar(
+                    total=r.chunk_pages or 1,
+                    completed=r.chunk_done_pages,
+                    width=SUB_BAR_WIDTH,
+                    complete_style="yellow",
+                    finished_style="green",
+                )
                 line = Table.grid(padding=(0, 1))
                 line.add_row(
                     r.spinner,
-                    Text(
-                        f"chunk {index + 1}  pages {start_page}-{end_page}"
-                        "   processing…",
-                        style="yellow",
-                    ),
+                    Text(f"chunk {index + 1}  pages {start_page}-{end_page}", "yellow"),
+                    sub,
+                    Text(f"page {r.chunk_done_pages}/{r.chunk_pages}", "dim"),
                 )
                 yield Padding(line, (0, 4))
+
+        if r.logs:
+            yield Text("")
+            body = Text(
+                "\n".join(r.logs), style="dim", no_wrap=True, overflow="ellipsis"
+            )
+            yield Padding(
+                Panel(
+                    body,
+                    title="yomitoku",
+                    title_align="left",
+                    border_style="grey37",
+                    padding=(0, 1),
+                ),
+                (0, 2),
+            )
         yield Text("")
 
 
@@ -309,10 +341,17 @@ class RichReporter(ProgressReporter):
         self.done_pages_at_start = 0
         self.current: tuple[int, int, int] | None = None
         self.current_index: int | None = None
+        self.chunk_pages = 0
+        self.chunk_done_pages = 0
         self.recent: deque[tuple[str, str, str]] = deque(maxlen=RECENT_LIMIT)
+        self.logs: deque[str] = deque(maxlen=LOG_LIMIT)
         self.spinner = Spinner("dots", style="yellow")
         self._chunk_started_at = 0.0
         self.live: Live | None = None
+
+    @property
+    def displayed_done(self) -> int:
+        return self.done_pages + min(self.chunk_done_pages, self.chunk_pages)
 
     def start(
         self,
@@ -350,12 +389,25 @@ class RichReporter(ProgressReporter):
     ) -> None:
         self.current = (index, start_page, end_page)
         self.current_index = index
+        self.chunk_pages = page_count
+        self.chunk_done_pages = 0
         self._chunk_started_at = time.monotonic()
+
+    def page_tick(self) -> None:
+        if self.chunk_done_pages < self.chunk_pages:
+            self.chunk_done_pages += 1
+
+    def log_line(self, line: str) -> None:
+        cleaned = clean_log_line(line)
+        if cleaned:
+            self.logs.append(cleaned)
 
     def chunk_done(
         self, *, index: int, start_page: int, end_page: int, done_pages: int
     ) -> None:
         self.done_pages = done_pages
+        self.chunk_done_pages = 0
+        self.chunk_pages = 0
         duration = format_duration(time.monotonic() - self._chunk_started_at)
         label = f"chunk {index + 1}  pages {start_page}-{end_page}   done in {duration}"
         self.recent.append(("✓", "green", label))

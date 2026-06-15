@@ -5,11 +5,14 @@ import csv
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
+from collections import deque
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -17,13 +20,18 @@ from typing import Any
 from pypdf import PdfReader, PdfWriter
 
 from yomitoku_rocm.executable import find_yomitoku_executable
-from yomitoku_rocm.progress import make_reporter
+from yomitoku_rocm.progress import ProgressReporter, make_reporter
 
 MANIFEST_VERSION = 1
 DEFAULT_CHUNK_SIZE = 10
 SUPPORTED_FORMATS = {"json", "csv", "html", "md", "pdf"}
 CAPTURED_TAIL_LINES = 20
 RESUME_HINT = "Re-run the same command to resume after fixing the error."
+INTERRUPT_HINT = "Interrupted. Re-run the same command to resume from where it stopped."
+# yomitoku runs the text recognizer exactly once per page; counting these log
+# lines gives a best-effort per-page progress signal (it degrades gracefully if
+# the format changes — the bar simply stops advancing mid-chunk).
+PAGE_MARKER = re.compile(r"TextRecognizer\b.*\belapsed_time:")
 
 
 @dataclass(frozen=True)
@@ -104,6 +112,43 @@ def main() -> int:
     done_pages_at_start = count_done_pages(chunks, manifest)
     final_path = final_output_path(input_pdf, outdir, fmt)
 
+    try:
+        return run_pipeline(
+            args=args,
+            yomitoku_args=yomitoku_args,
+            chunks=chunks,
+            manifest=manifest,
+            manifest_path=manifest_path,
+            exe=exe,
+            fmt=fmt,
+            input_pdf=input_pdf,
+            final_path=final_path,
+            workdir=workdir,
+            total_pages=total_pages,
+            started_at=started_at,
+            done_pages_at_start=done_pages_at_start,
+        )
+    except KeyboardInterrupt:
+        print(f"\n{INTERRUPT_HINT}", file=sys.stderr, flush=True)
+        return 130
+
+
+def run_pipeline(
+    *,
+    args: argparse.Namespace,
+    yomitoku_args: list[str],
+    chunks: list[Chunk],
+    manifest: dict[str, Any],
+    manifest_path: Path,
+    exe: str,
+    fmt: str,
+    input_pdf: Path,
+    final_path: Path,
+    workdir: Path,
+    total_pages: int,
+    started_at: float,
+    done_pages_at_start: int,
+) -> int:
     with make_reporter(verbose=args.verbose) as reporter:
         reporter.start(
             input_label=str(input_pdf),
@@ -113,6 +158,7 @@ def main() -> int:
             total_chunks=len(chunks),
             done_pages=done_pages_at_start,
         )
+        on_line = make_line_handler(reporter)
 
         for chunk in chunks:
             chunk_key = str(chunk.index)
@@ -140,7 +186,7 @@ def main() -> int:
             )
             chunk.outdir.mkdir(parents=True, exist_ok=True)
             command = build_yomitoku_command(exe, yomitoku_args, chunk, fmt)
-            result = run_chunk(command, capture=not args.verbose)
+            result = run_chunk(command, capture=not args.verbose, on_line=on_line)
             if result.returncode != 0:
                 chunk_state.update(
                     {
@@ -213,22 +259,76 @@ def main() -> int:
     return 0
 
 
-def run_chunk(command: list[str], capture: bool) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+@dataclass
+class ChunkResult:
+    returncode: int
+    tail: list[str] = field(default_factory=list)
+
+
+def make_line_handler(reporter: ProgressReporter) -> Callable[[str], None]:
+    def handle(line: str) -> None:
+        reporter.log_line(line)
+        if PAGE_MARKER.search(line):
+            reporter.page_tick()
+
+    return handle
+
+
+def run_chunk(
+    command: list[str], *, capture: bool, on_line: Callable[[str], None]
+) -> ChunkResult:
+    """Run a chunk, streaming output line by line so progress stays live.
+
+    When ``capture`` is false the child inherits stdio (``--verbose``); otherwise
+    output is piped, forwarded to ``on_line``, and the tail is kept for failures.
+    On KeyboardInterrupt the child is terminated before the exception propagates.
+    """
+    if not capture:
+        proc = subprocess.Popen(command, env=child_env())
+        try:
+            return ChunkResult(returncode=proc.wait())
+        except KeyboardInterrupt:
+            terminate_process(proc)
+            raise
+
+    proc = subprocess.Popen(
         command,
-        check=False,
         env=child_env(),
-        capture_output=capture,
-        text=capture,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
     )
+    tail: deque[str] = deque(maxlen=CAPTURED_TAIL_LINES)
+    try:
+        assert proc.stdout is not None
+        for raw in proc.stdout:
+            line = raw.rstrip("\n")
+            tail.append(line)
+            on_line(line)
+        return ChunkResult(returncode=proc.wait(), tail=list(tail))
+    except KeyboardInterrupt:
+        terminate_process(proc)
+        raise
+    finally:
+        if proc.stdout is not None:
+            proc.stdout.close()
 
 
-def tail_output(result: subprocess.CompletedProcess[str]) -> list[str] | None:
-    chunks = [result.stdout or "", result.stderr or ""]
-    combined = "\n".join(part.strip() for part in chunks if part and part.strip())
-    if not combined:
-        return None
-    return combined.splitlines()[-CAPTURED_TAIL_LINES:]
+def terminate_process(proc: subprocess.Popen[Any]) -> None:
+    if proc.poll() is not None:
+        return
+    proc.terminate()
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+
+
+def tail_output(result: ChunkResult) -> list[str] | None:
+    lines = [line for line in result.tail if line.strip()]
+    return lines or None
 
 
 def parse_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:

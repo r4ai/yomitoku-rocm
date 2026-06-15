@@ -7,6 +7,7 @@ from rich.console import Console
 from yomitoku_rocm.progress import (
     PlainReporter,
     RichReporter,
+    clean_log_line,
     compute_metrics,
     format_duration,
     make_reporter,
@@ -110,6 +111,44 @@ def test_plain_reporter_failure_writes_to_error_stream():
     assert "yomitoku exited with code 1 on chunk 1." in error_text
     assert "  | RuntimeError: boom" in error_text
     assert "Re-run to resume." in error_text
+
+
+def test_clean_log_line_strips_logger_prefix():
+    raw = "2026-06-15 17:00:00,1 - yomitoku.text_recognizer - INFO - hello world"
+    assert clean_log_line(raw) == "hello world"
+    assert clean_log_line("plain line") == "plain line"
+    assert clean_log_line("  trailing  \n") == "  trailing"
+
+
+def test_page_tick_advances_displayed_done_and_caps_at_chunk_pages():
+    reporter = RichReporter(console=Console(file=io.StringIO()))
+    reporter.start(
+        input_label="d.pdf",
+        output_label="o.md",
+        fmt="md",
+        total_pages=20,
+        total_chunks=2,
+        done_pages=0,
+    )
+    reporter.chunk_start(
+        index=0, total_chunks=2, start_page=1, end_page=10, page_count=10
+    )
+    assert reporter.displayed_done == 0
+    reporter.page_tick()
+    reporter.page_tick()
+    assert reporter.displayed_done == 2
+    for _ in range(50):
+        reporter.page_tick()
+    assert reporter.displayed_done == 10  # capped at the chunk's page count
+    reporter.chunk_done(index=0, start_page=1, end_page=10, done_pages=10)
+    assert reporter.displayed_done == 10  # reconciles to committed pages
+
+
+def test_log_line_keeps_only_recent_cleaned_lines():
+    reporter = RichReporter(console=Console(file=io.StringIO()))
+    for i in range(6):
+        reporter.log_line(f"ts - yomitoku - INFO - line {i}")
+    assert list(reporter.logs) == ["line 3", "line 4", "line 5"]
 
 
 def test_rich_reporter_renders_without_crashing():
