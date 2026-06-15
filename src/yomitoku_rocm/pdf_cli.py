@@ -18,7 +18,6 @@ from pypdf import PdfReader, PdfWriter
 
 from yomitoku_rocm.executable import find_yomitoku_executable
 
-
 MANIFEST_VERSION = 1
 DEFAULT_CHUNK_SIZE = 10
 SUPPORTED_FORMATS = {"json", "csv", "html", "md", "pdf"}
@@ -60,7 +59,8 @@ def main() -> int:
     fmt = resolve_format(yomitoku_args)
     if fmt not in SUPPORTED_FORMATS:
         print(
-            f"Invalid output format: {fmt}. Supported formats are {sorted(SUPPORTED_FORMATS)}",
+            f"Invalid output format: {fmt}. "
+            f"Supported formats are {sorted(SUPPORTED_FORMATS)}",
             file=sys.stderr,
         )
         return 2
@@ -76,7 +76,9 @@ def main() -> int:
 
     outdir.mkdir(parents=True, exist_ok=True)
     fingerprint = fingerprint_pdf(input_pdf)
-    workdir = (args.workdir or outdir / ".yomitoku-pdf" / fingerprint.sha256[:16]).resolve()
+    workdir = (
+        args.workdir or outdir / ".yomitoku-pdf" / fingerprint.sha256[:16]
+    ).resolve()
     manifest_path = workdir / "manifest.json"
 
     if args.no_resume and workdir.exists():
@@ -102,8 +104,14 @@ def main() -> int:
         chunk_key = str(chunk.index)
         chunk_state = manifest["chunks"].setdefault(chunk_key, {})
         output_path = chunk_state.get("output_path")
-        if chunk_state.get("status") == "done" and output_path and Path(output_path).exists():
-            print_progress(chunks, manifest, started_at, done_pages_at_start, skipped=True)
+        if (
+            chunk_state.get("status") == "done"
+            and output_path
+            and Path(output_path).exists()
+        ):
+            print_progress(
+                chunks, manifest, started_at, done_pages_at_start, skipped=True
+            )
             continue
 
         print(
@@ -135,7 +143,10 @@ def main() -> int:
         if produced is None:
             chunk_state.update({"status": "failed", "updated_at": now_iso()})
             save_manifest(manifest_path, manifest)
-            print(f"YomiToku completed but no .{fmt} output was found in {chunk.outdir}", file=sys.stderr)
+            print(
+                f"YomiToku completed but no .{fmt} output was found in {chunk.outdir}",
+                file=sys.stderr,
+            )
             return 1
 
         chunk_state.update(
@@ -171,7 +182,9 @@ def parse_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
     parser.add_argument("--workdir", type=Path, default=None)
     parser.add_argument("--no-resume", action="store_true")
     parser.add_argument("--keep-workdir", action="store_true")
-    parser.add_argument("--force", action="store_true", help="discard incompatible saved progress")
+    parser.add_argument(
+        "--force", action="store_true", help="discard incompatible saved progress"
+    )
     args, yomitoku_args = parser.parse_known_args(argv)
     if args.chunk_size < 1:
         parser.error("--chunk-size must be greater than zero")
@@ -290,7 +303,9 @@ def save_manifest(path: Path, manifest: dict[str, Any]) -> None:
     tmp_path.replace(path)
 
 
-def write_chunks(reader: PdfReader, chunks: list[Chunk], manifest: dict[str, Any]) -> None:
+def write_chunks(
+    reader: PdfReader, chunks: list[Chunk], manifest: dict[str, Any]
+) -> None:
     for chunk in chunks:
         if chunk.input_path.exists():
             continue
@@ -310,7 +325,9 @@ def write_chunks(reader: PdfReader, chunks: list[Chunk], manifest: dict[str, Any
         )
 
 
-def build_yomitoku_command(exe: str, args: list[str], chunk: Chunk, fmt: str) -> list[str]:
+def build_yomitoku_command(
+    exe: str, args: list[str], chunk: Chunk, fmt: str
+) -> list[str]:
     forwarded = strip_yomitoku_positionals_and_output(args)
     command = [exe, str(chunk.input_path), "-o", str(chunk.outdir), "-f", fmt]
     command.extend(forwarded)
@@ -336,7 +353,10 @@ def strip_yomitoku_positionals_and_output(args: list[str]) -> list[str]:
         if arg in options_with_value:
             skip_next = True
             continue
-        if any(arg.startswith(f"{option}=") for option in ["--format", "--outdir", "--pages"]):
+        if any(
+            arg.startswith(f"{option}=")
+            for option in ["--format", "--outdir", "--pages"]
+        ):
             continue
         stripped.append(arg)
     return stripped
@@ -377,7 +397,10 @@ def print_progress(
     processed_this_run = max(done_pages - done_pages_at_start, 0)
     prefix = "resume" if skipped else "progress"
     if processed_this_run == 0:
-        print(f"[{prefix}] {done_pages}/{total_pages} pages done; ETA calculating", flush=True)
+        print(
+            f"[{prefix}] {done_pages}/{total_pages} pages done; ETA calculating",
+            flush=True,
+        )
         return
     seconds_per_page = elapsed / processed_this_run
     remaining_pages = total_pages - done_pages
@@ -402,7 +425,9 @@ def merge_outputs(
     fmt: str,
     encoding: str,
 ) -> None:
-    paths = [Path(manifest["chunks"][str(chunk.index)]["output_path"]) for chunk in chunks]
+    paths = [
+        Path(manifest["chunks"][str(chunk.index)]["output_path"]) for chunk in chunks
+    ]
     if fmt == "pdf":
         writer = PdfWriter()
         for path in paths:
@@ -424,7 +449,9 @@ def merge_outputs(
             json.dump(data, f, ensure_ascii=False, indent=2)
             f.write("\n")
     elif fmt == "csv":
-        with final_path.open("w", newline="", encoding=encoding, errors="ignore") as out:
+        with final_path.open(
+            "w", newline="", encoding=encoding, errors="ignore"
+        ) as out:
             writer = csv.writer(out)
             for path in paths:
                 with path.open(newline="", encoding=encoding, errors="ignore") as inp:

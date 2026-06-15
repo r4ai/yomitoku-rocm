@@ -38,11 +38,15 @@ def check_rocm_devices() -> bool:
     ok &= print_check("/dev/dxg", Path("/dev/dxg").exists(), "required for ROCm on WSL")
 
     rocminfo_path = shutil.which("rocminfo")
-    ok &= print_check("rocminfo command", rocminfo_path is not None, rocminfo_path or "not found")
+    ok &= print_check(
+        "rocminfo command", rocminfo_path is not None, rocminfo_path or "not found"
+    )
     if rocminfo_path is not None:
         code, output = command_output([rocminfo_path])
         has_agent = "Agent " in output
-        gfx_lines = [line.strip() for line in output.splitlines() if "gfx" in line.lower()]
+        gfx_lines = [
+            line.strip() for line in output.splitlines() if "gfx" in line.lower()
+        ]
         detail = "; ".join(gfx_lines[:3]) if gfx_lines else "no gfx agent lines found"
         ok &= print_check("rocminfo GPU agent", code == 0 and has_agent, detail)
 
@@ -79,7 +83,9 @@ def check_python_packages() -> bool:
         ok &= print_check("yomitoku import", True, f"version={version}")
 
     yomitoku_cli = find_yomitoku_executable()
-    ok &= print_check("yomitoku CLI", yomitoku_cli is not None, yomitoku_cli or "not found")
+    ok &= print_check(
+        "yomitoku CLI", yomitoku_cli is not None, yomitoku_cli or "not found"
+    )
     if yomitoku_cli is not None:
         code, output = command_output([yomitoku_cli, "--help"])
         first_line = output.splitlines()[0] if output.splitlines() else "no output"
