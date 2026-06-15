@@ -1,6 +1,6 @@
 # yomitoku-rocm
 
-ROCm on WSL2 で [YomiToku](https://github.com/kotaro-kinoshita/yomitoku) を動かすための環境セットアップ集です。AMD GPU 向けの PyTorch ROCm 依存関係、mise タスク、環境確認ツール（doctor）をまとめています。
+ROCm on WSL2 で [YomiToku](https://github.com/kotaro-kinoshita/yomitoku) を動かすための環境セットアップ集です。AMD GPU 向けの PyTorch ROCm 依存関係、mise タスク、環境確認ツール（doctor）を備えています。
 
 ## 前提条件
 
@@ -104,13 +104,13 @@ mise run doctor
 yomitoku-rocm --help
 ```
 
-巨大な PDF には `yomitoku-pdf` を使います。入力 PDF をデフォルト 10 ページ単位のチャンク PDF に分けて OCR し、最後に 1 つの出力へ結合します。
+ページ数の多い PDF には `yomitoku-pdf` を使います。PDF をデフォルト 10 ページ単位のチャンクに分けて OCR し、最後に 1 つの出力へ結合します。
 
 ```bash
 yomitoku-pdf large.pdf -o results -f pdf -d cuda
 ```
 
-実行中は完了ページ数、進捗率、残り時間、予想終了時刻をチャンクごとに表示します。途中で停止した場合は `results/.yomitoku-pdf/<fingerprint>/manifest.json` とチャンク出力を使って、同じ PDF・同じチャンクサイズ・同じ出力形式で再実行したときに完了済みチャンクをスキップします。正常完了後、この作業ディレクトリは自動削除されます。
+実行中は完了ページ数、進捗率、残り時間、予想終了時刻をチャンクごとに表示します。途中で停止した場合は、同じ PDF・チャンクサイズ・出力形式で再実行すると `results/.yomitoku-pdf/<fingerprint>/manifest.json` をもとに完了済みチャンクをスキップして再開します。正常完了後はこの作業ディレクトリを自動削除します。
 
 ```bash
 # 20 ページ単位に変更
@@ -123,7 +123,7 @@ yomitoku-pdf large.pdf --keep-workdir -o results -f pdf -d cuda
 yomitoku-pdf large.pdf --no-resume -o results -f pdf -d cuda
 ```
 
-`yomitoku-pdf` はグローバルインストール後に直接実行した場合も、子プロセスへ `HSA_ENABLE_DXG_DETECTION=1` を補います。
+`yomitoku-pdf` はグローバルインストール後に直接実行した場合も、子プロセスに `HSA_ENABLE_DXG_DETECTION=1` を自動で渡します。
 
 ### グローバルインストール後
 
@@ -152,7 +152,7 @@ mise run ocr-pdf -- large.pdf -o results -f pdf -d cuda
 
 ## 依存関係について
 
-PyTorch 関連パッケージは `https://download.pytorch.org/whl/rocm7.2` から取得するよう `pyproject.toml` で明示しています。2026-06-14 時点でこの index の Python 3.12 向け整合セットとして `torch==2.11.0`、`torchvision==0.26.0`、`torchaudio==2.11.0` を固定しています。
+PyTorch 関連パッケージは `https://download.pytorch.org/whl/rocm7.2` から取得するよう `pyproject.toml` で明示しています。2026-06-14 時点でこの index の Python 3.12 向け互換セットとして `torch==2.11.0`、`torchvision==0.26.0`、`torchaudio==2.11.0` を固定しています。
 
 ## トラブルシュート
 
