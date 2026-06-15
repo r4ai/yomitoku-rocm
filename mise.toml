@@ -27,3 +27,7 @@ run = "bash scripts/setup-wsl-rocm.sh"
 [tasks.ocr]
 description = "Run YomiToku OCR on a PDF or image. Usage: mise run ocr -- input.pdf [args...]"
 run = "uv run yomitoku"
+
+[tasks.ocr-pdf]
+description = "Run resumable chunked YomiToku OCR on a large PDF. Usage: mise run ocr-pdf -- input.pdf [args...]"
+run = "uv run yomitoku-pdf"

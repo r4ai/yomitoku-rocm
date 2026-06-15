@@ -104,6 +104,27 @@ mise run doctor
 yomitoku-rocm --help
 ```
 
+巨大な PDF には `yomitoku-pdf` を使います。入力 PDF をデフォルト 10 ページ単位のチャンク PDF に分けて OCR し、最後に 1 つの出力へ結合します。
+
+```bash
+yomitoku-pdf large.pdf -o results -f pdf -d cuda
+```
+
+実行中は完了ページ数、進捗率、残り時間、予想終了時刻をチャンクごとに表示します。途中で停止した場合は `results/.yomitoku-pdf/<fingerprint>/manifest.json` とチャンク出力を使って、同じ PDF・同じチャンクサイズ・同じ出力形式で再実行したときに完了済みチャンクをスキップします。正常完了後、この作業ディレクトリは自動削除されます。
+
+```bash
+# 20 ページ単位に変更
+yomitoku-pdf large.pdf --chunk-size 20 -o results -f pdf -d cuda
+
+# デバッグ用に途中成果物を残す
+yomitoku-pdf large.pdf --keep-workdir -o results -f pdf -d cuda
+
+# 保存済み進捗を使わず最初から実行
+yomitoku-pdf large.pdf --no-resume -o results -f pdf -d cuda
+```
+
+`yomitoku-pdf` はグローバルインストール後に直接実行した場合も、子プロセスへ `HSA_ENABLE_DXG_DETECTION=1` を補います。
+
 ### グローバルインストール後
 
 ```bash
@@ -115,12 +136,16 @@ yomitoku-rocm sample.pdf -o results -f md -d cuda --combine --figure
 
 # CPU で動作確認（GPU なし環境）
 yomitoku-rocm sample.pdf -o results -f md --lite -d cpu
+
+# 巨大 PDF を分割処理して searchable PDF を作成
+yomitoku-pdf large.pdf -o results -f pdf -d cuda
 ```
 
 ### mise 経由（開発環境）
 
 ```bash
 mise run ocr -- sample.pdf -o results -f pdf -d cuda --combine
+mise run ocr-pdf -- large.pdf -o results -f pdf -d cuda
 ```
 
 `mise run ocr` は `uv run yomitoku` を直接呼びます。`HSA_ENABLE_DXG_DETECTION=1` も自動的に設定されます。
