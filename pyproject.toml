@@ -22,8 +22,8 @@ yomitoku-rocm-doctor = "yomitoku_rocm.doctor:main"
 
 [dependency-groups]
 dev = [
-    "pytest>=9.1.0",
-    "ruff==0.15.17",
+    "pytest>=9.1.1",
+    "ruff==0.15.18",
 ]
 
 [build-system]
