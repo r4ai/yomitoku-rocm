@@ -1067,7 +1067,7 @@ wheels = [
 
 [[package]]
 name = "yomitoku"
-version = "0.13.0"
+version = "0.14.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "huggingface-hub" },
@@ -1088,9 +1088,9 @@ dependencies = [
     { name = "torch" },
     { name = "torchvision" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c4/5c/04392df70524b770a25c6090de0247b4d92994d049f60baeebf65412ea75/yomitoku-0.13.0.tar.gz", hash = "sha256:ec0bc190472c2a08ae5a6eb470317d3750b16fb145b57c9b161830fe609973da", size = 65902160, upload-time = "2026-05-14T08:58:08.964Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/23/58/72be531dd719ce5e258afca220e9d149b22f9700122ea8996492721a34bc/yomitoku-0.14.0.tar.gz", hash = "sha256:25f718740e6048a24c880b0853a7997d048f6aae10349074cf63b22df1005994", size = 72648856, upload-time = "2026-07-31T09:18:26.421Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5e/c4/3abbed0e0161ad6cc42da8e68b94175f22c5a2cfefc05d4766a05add39c4/yomitoku-0.13.0-py3-none-any.whl", hash = "sha256:73a7ec97c144899e8f99dbd09c6bc075c147590e688e346322eecbd267a7da58", size = 8156541, upload-time = "2026-05-14T08:58:12.805Z" },
+    { url = "https://files.pythonhosted.org/packages/07/0f/eb4e1720cfe01fc8ca8aca9c4da0ff77032806c5894e243049d8f0cb59bd/yomitoku-0.14.0-py3-none-any.whl", hash = "sha256:53fda18a8fa81963085b192d4683f427a85a9e0d7bded1227ff2b2634519acd8", size = 8184213, upload-time = "2026-07-31T09:18:22.066Z" },
 ]
 
 [[package]]
@@ -1121,7 +1121,7 @@ requires-dist = [
     { name = "torchaudio", specifier = "==2.11.0", index = "https://download.pytorch.org/whl/rocm7.2" },
     { name = "torchvision", specifier = "==0.26.0", index = "https://download.pytorch.org/whl/rocm7.2" },
     { name = "triton-rocm", specifier = "==3.6.0", index = "https://download.pytorch.org/whl/rocm7.2" },
-    { name = "yomitoku", specifier = "==0.13.0" },
+    { name = "yomitoku", specifier = "==0.14.0" },
 ]
 
 [package.metadata.requires-dev]
