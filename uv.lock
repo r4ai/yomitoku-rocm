@@ -735,11 +735,11 @@ wheels = [
 
 [[package]]
 name = "pypdf"
-version = "6.14.0"
+version = "6.16.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e3/de/edd6908e6d81068f9a70c3164f391390bd8f89b96afeef917933b848a094/pypdf-6.14.0.tar.gz", hash = "sha256:cb3f797cc05e61fc6dd1e5735fd1b1bc2946112abc47f7184f68d5d72aa6a696", size = 6489606, upload-time = "2026-06-22T14:45:55.38Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b6/5a/df92d1c1ef8806ca28f20f978ee059894868d93de797a7e2edebe7fe1a43/pypdf-6.16.1.tar.gz", hash = "sha256:c4d1b43ddae921387321cf63936cd16a7743b91d2da92f165c149a195c972ba9", size = 7003737, upload-time = "2026-08-14T12:24:04.531Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/dd/79/aec83d5dd98784a1afac704b38070609e1571b37a9111ec98f13051c4141/pypdf-6.14.0-py3-none-any.whl", hash = "sha256:48d4bf5c5352b06ecb2794c0fbe9e91ca6648c77e4be6734517dede9f31790e2", size = 348961, upload-time = "2026-06-22T14:45:53.179Z" },
+    { url = "https://files.pythonhosted.org/packages/33/a1/724b18d6757ab7253a8fecd3a430eb8d980ed26872ba16651e7b5ddfc63f/pypdf-6.16.1-py3-none-any.whl", hash = "sha256:63fec31c4092ae50b6729beedcb469055b60d20c834bde1c402df241f371f644", size = 382924, upload-time = "2026-08-14T12:24:02.854Z" },
 ]
 
 [[package]]
@@ -1115,7 +1115,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "pypdf", specifier = ">=6.14.0" },
+    { name = "pypdf", specifier = ">=6.16.1" },
     { name = "rich", specifier = ">=13.7.0" },
     { name = "torch", specifier = "==2.11.0", index = "https://download.pytorch.org/whl/rocm7.2" },
     { name = "torchaudio", specifier = "==2.11.0", index = "https://download.pytorch.org/whl/rocm7.2" },
